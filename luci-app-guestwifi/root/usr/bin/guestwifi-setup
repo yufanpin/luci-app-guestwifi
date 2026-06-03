@@ -1,0 +1,260 @@
+#!/bin/bash
+
+GUEST_IFACE="guest"
+GUEST_BRIDGE="br-guest"
+DHCP_LEASE_FILE="/tmp/dhcp.leases.guest"
+SELF_CONFIG="/etc/config/guestwifi"
+
+. /lib/functions.sh
+
+log() {
+	logger -t guestwifi "$1"
+}
+
+remove_guest_config() {
+	uci -q delete network.${GUEST_IFACE}
+	uci -q delete network.${GUEST_BRIDGE}
+	uci -q delete dhcp.${GUEST_IFACE}
+	uci -q delete firewall.guestzone
+	uci -q delete firewall.guest_wan_fwd
+	uci -q delete firewall.guest_drop_lan
+	uci -q delete firewall.guest_allow_dns
+	uci -q delete firewall.guest_allow_dhcp
+
+	for dev in wifi0 wifi1 wifi2; do
+		uci -q delete wireless.${dev}_guest
+	done
+
+	uci commit network
+	uci commit dhcp
+	uci commit firewall
+	uci commit wireless
+
+	rm -f "$DHCP_LEASE_FILE"
+}
+
+restart_services() {
+	/etc/init.d/network reload 2>/dev/null
+	sleep 1
+	/etc/init.d/firewall restart 2>/dev/null
+	/etc/init.d/dnsmasq restart 2>/dev/null
+	sleep 1
+	wifi reload 2>/dev/null
+}
+
+cleanup_all() {
+	echo "=== 完全卸载访客WiFi ==="
+	remove_guest_config
+	restart_services
+	rm -f "$SELF_CONFIG"
+	echo "已删除: $SELF_CONFIG"
+	echo ""
+	echo "=== 恢复完成 ==="
+	echo "如有残留配置，可手动执行以下命令检查："
+	echo "  uci show network | grep guest"
+	echo "  uci show dhcp | grep guest"
+	echo "  uci show firewall | grep guest"
+	echo "  uci show wireless | grep guest"
+}
+
+if [ "$1" = "cleanup" ] || [ "$1" = "uninstall" ]; then
+	cleanup_all
+	exit 0
+fi
+
+config_load guestwifi
+config_get enabled settings enabled
+config_get mode settings mode
+config_get ssid settings ssid
+config_get encryption settings encryption
+config_get key settings key
+config_get ssid_24g settings ssid_24g
+config_get encryption_24g settings encryption_24g
+config_get key_24g settings key_24g
+config_get ssid_5g_low settings ssid_5g_low
+config_get encryption_5g_low settings encryption_5g_low
+config_get key_5g_low settings key_5g_low
+config_get ssid_5g_high settings ssid_5g_high
+config_get encryption_5g_high settings encryption_5g_high
+config_get key_5g_high settings key_5g_high
+config_get subnet settings subnet
+config_get netmask settings netmask
+config_get dhcp_start settings dhcp_start
+config_get dhcp_limit settings dhcp_limit
+config_get leasetime settings leasetime
+config_get isolate settings isolate
+config_get ap_isolate settings ap_isolate
+config_get lan_isolate settings lan_isolate
+config_get radio24g settings radio24g
+config_get radio5g_low settings radio5g_low
+config_get radio5g_high settings radio5g_high
+
+: ${subnet:="192.168.200.1"}
+: ${netmask:="255.255.255.0"}
+: ${dhcp_start:="100"}
+: ${dhcp_limit:="50"}
+: ${leasetime:="12h"}
+: ${ap_isolate:=${isolate:-1}}
+: ${lan_isolate:="1"}
+
+GUEST_NET="${subnet%.*}"
+
+setup_guest_network() {
+	uci -q delete network.${GUEST_IFACE}
+	uci -q delete network.${GUEST_BRIDGE}
+
+	uci set network.${GUEST_IFACE}="interface"
+	uci set network.${GUEST_IFACE}.type="bridge"
+	uci set network.${GUEST_IFACE}.ifname=""
+	uci set network.${GUEST_IFACE}.proto="static"
+	uci set network.${GUEST_IFACE}.ipaddr="${subnet}"
+	uci set network.${GUEST_IFACE}.netmask="${netmask}"
+
+	uci commit network
+}
+
+setup_guest_dhcp() {
+	uci -q delete dhcp.${GUEST_IFACE}
+
+	uci set dhcp.${GUEST_IFACE}="dhcp"
+	uci set dhcp.${GUEST_IFACE}.interface="${GUEST_IFACE}"
+	uci set dhcp.${GUEST_IFACE}.start="${dhcp_start}"
+	uci set dhcp.${GUEST_IFACE}.limit="${dhcp_limit}"
+	uci set dhcp.${GUEST_IFACE}.leasetime="${leasetime}"
+	uci set dhcp.${GUEST_IFACE}.dhcpv6="disabled"
+	uci set dhcp.${GUEST_IFACE}.ra="disabled"
+	uci add_list dhcp.${GUEST_IFACE}.dhcp_option="6,${subnet}"
+
+	uci commit dhcp
+}
+
+setup_guest_firewall() {
+	uci -q delete firewall.guestzone
+	uci -q delete firewall.guest_wan_fwd
+	uci -q delete firewall.guest_drop_lan
+	uci -q delete firewall.guest_allow_dns
+	uci -q delete firewall.guest_allow_dhcp
+
+	uci set firewall.guestzone="zone"
+	uci set firewall.guestzone.name="guest"
+	uci set firewall.guestzone.network="${GUEST_IFACE}"
+	uci set firewall.guestzone.input="REJECT"
+	uci set firewall.guestzone.forward="REJECT"
+	uci set firewall.guestzone.output="ACCEPT"
+
+	uci set firewall.guest_wan_fwd="forwarding"
+	uci set firewall.guest_wan_fwd.src="guest"
+	uci set firewall.guest_wan_fwd.dest="wan"
+
+	uci set firewall.guest_allow_dns="rule"
+	uci set firewall.guest_allow_dns.name="guest-allow-dns"
+	uci set firewall.guest_allow_dns.src="guest"
+	uci set firewall.guest_allow_dns.proto="tcp udp"
+	uci set firewall.guest_allow_dns.dest_port="53"
+	uci set firewall.guest_allow_dns.target="ACCEPT"
+
+	uci set firewall.guest_allow_dhcp="rule"
+	uci set firewall.guest_allow_dhcp.name="guest-allow-dhcp"
+	uci set firewall.guest_allow_dhcp.src="guest"
+	uci set firewall.guest_allow_dhcp.proto="udp"
+	uci set firewall.guest_allow_dhcp.src_port="68"
+	uci set firewall.guest_allow_dhcp.dest_port="67"
+	uci set firewall.guest_allow_dhcp.target="ACCEPT"
+
+	if [ "${lan_isolate:-1}" = "1" ]; then
+		uci set firewall.guest_drop_lan="rule"
+		uci set firewall.guest_drop_lan.name="guest-deny-lan"
+		uci set firewall.guest_drop_lan.src="guest"
+		uci set firewall.guest_drop_lan.dest="lan"
+		uci set firewall.guest_drop_lan.target="REJECT"
+	fi
+
+	uci commit firewall
+}
+
+setup_guest_wifi() {
+	local wifi_devices=""
+	if [ "${radio24g:-1}" = "1" ]; then
+		wifi_devices="$wifi_devices wifi1:24g"
+	fi
+	if [ "${radio5g_low:-1}" = "1" ]; then
+		wifi_devices="$wifi_devices wifi2:5g_low"
+	fi
+	if [ "${radio5g_high:-1}" = "1" ]; then
+		wifi_devices="$wifi_devices wifi0:5g_high"
+	fi
+
+	for pair in $wifi_devices; do
+		local dev="${pair%%:*}"
+		local band="${pair##*:}"
+		local guest_section="${dev}_guest"
+
+		uci -q delete wireless.${guest_section}
+		uci set wireless.${guest_section}="wifi-iface"
+		uci set wireless.${guest_section}.device="${dev}"
+		uci set wireless.${guest_section}.mode="ap"
+		uci set wireless.${guest_section}.network="${GUEST_IFACE}"
+		uci set wireless.${guest_section}.wmm="1"
+
+		if [ "${ap_isolate:-1}" = "1" ]; then
+			uci set wireless.${guest_section}.isolate="1"
+		fi
+
+		if [ "${mode:-unified}" = "separate" ]; then
+			local bssid benc bkey
+			config_get bssid settings "ssid_${band}"
+			config_get benc settings "encryption_${band}"
+			config_get bkey settings "key_${band}"
+			: ${bssid:="Guest-${band}"}
+			: ${benc:="psk2+ccmp"}
+
+			uci set wireless.${guest_section}.ssid="${bssid}"
+			if [ "${benc}" = "none" ]; then
+				uci set wireless.${guest_section}.encryption="none"
+			else
+				uci set wireless.${guest_section}.encryption="${benc}"
+				[ -n "$bkey" ] && uci set wireless.${guest_section}.key="${bkey}"
+			fi
+		else
+			uci set wireless.${guest_section}.ssid="${ssid:-GuestWiFi}"
+			if [ "${encryption:-psk2+ccmp}" = "none" ]; then
+				uci set wireless.${guest_section}.encryption="none"
+			else
+				uci set wireless.${guest_section}.encryption="${encryption:-psk2+ccmp}"
+				uci set wireless.${guest_section}.key="${key:-Guest@123456}"
+			fi
+		fi
+	done
+
+	uci commit wireless
+}
+
+cleanup_tc_limit() {
+	local ifaces="br-guest ath01 ath11 ath21"
+	for iface in $ifaces; do
+		tc qdisc del dev "$iface" root 2>/dev/null
+		tc qdisc del dev "$iface" ingress 2>/dev/null
+	done
+}
+
+case "${enabled:-0}" in
+	1)
+		log "Enabling guest WiFi..."
+		remove_guest_config
+		setup_guest_network
+		setup_guest_dhcp
+		setup_guest_firewall
+		setup_guest_wifi
+		restart_services
+		cleanup_tc_limit
+		log "Guest WiFi enabled successfully (mode: ${mode:-unified})"
+		echo "Guest WiFi enabled: mode=${mode:-unified}, Subnet=${subnet}"
+		;;
+	0|*)
+		log "Disabling guest WiFi..."
+		remove_guest_config
+		restart_services
+		log "Guest WiFi disabled"
+		echo "Guest WiFi disabled"
+		;;
+esac

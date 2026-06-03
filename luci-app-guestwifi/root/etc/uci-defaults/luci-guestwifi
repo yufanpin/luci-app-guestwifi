@@ -1,0 +1,29 @@
+#!/bin/sh
+
+uci -q get guestwifi.settings >/dev/null || {
+	uci set guestwifi.settings=guestwifi
+	uci set guestwifi.settings.enabled=0
+	uci set guestwifi.settings.mode=unified
+	uci set guestwifi.settings.ssid=GuestWiFi
+	uci set guestwifi.settings.encryption=psk-mixed
+	uci set guestwifi.settings.key=Guest@123456
+	uci set guestwifi.settings.ssid_24g=Guest-2.4G
+	uci set guestwifi.settings.encryption_24g=psk2+ccmp
+	uci set guestwifi.settings.ssid_5g_low=Guest-5G-L
+	uci set guestwifi.settings.encryption_5g_low=psk2+ccmp
+	uci set guestwifi.settings.ssid_5g_high=Guest-5G-H
+	uci set guestwifi.settings.encryption_5g_high=psk2+ccmp
+	uci set guestwifi.settings.subnet=192.168.200.1
+	uci set guestwifi.settings.netmask=255.255.255.0
+	uci set guestwifi.settings.dhcp_start=100
+	uci set guestwifi.settings.dhcp_limit=50
+	uci set guestwifi.settings.leasetime=12h
+	uci set guestwifi.settings.ap_isolate=1
+	uci set guestwifi.settings.lan_isolate=1
+	uci set guestwifi.settings.radio24g=1
+	uci set guestwifi.settings.radio5g_low=0
+	uci set guestwifi.settings.radio5g_high=1
+	uci commit guestwifi
+}
+
+exit 0

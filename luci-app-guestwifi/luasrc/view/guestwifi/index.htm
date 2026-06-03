@@ -1,0 +1,131 @@
+<%+header%>
+<%
+local cfg = cfg or {}
+local function v(k, d) return cfg[k] ~= nil and cfg[k] ~= "" and cfg[k] or d end
+local function checked(k) return v(k, "0") == "1" and 'checked="checked"' or "" end
+local function sel(k, val) return v(k, "") == val and 'selected="selected"' or "" end
+local enabled = v("enabled", "0") == "1"
+local mode = v("mode", "unified")
+%>
+
+<style type="text/css">
+.gw-page{box-sizing:border-box;max-width:980px;padding:.25rem 0;font:inherit;color:inherit}.gw-page *{box-sizing:border-box;font-family:inherit}.gw-head{color:inherit;font-weight:700;padding:.35rem 0 .75rem;font-size:1.15rem;line-height:1.4;border-bottom:1px solid var(--border-color,#d7dce3);margin-bottom:.85rem}.gw-panel{background:var(--background-color-high,#fff);border:1px solid var(--border-color,#d7dce3);border-radius:6px;padding:1rem 1.15rem}.gw-row{display:flex;align-items:center;margin:.85rem 0}.gw-label{width:185px;text-align:right;color:var(--text-color-muted,#4a5568);font-size:.92rem;margin-right:1.1rem;line-height:1.4}.gw-field{flex:1;color:var(--text-color,#1a202c);line-height:1.45}.gw-hint{color:var(--text-color-muted,#718096);font-size:.82rem;margin-left:.7rem;line-height:1.5}.gw-divider{border-top:1px dashed var(--border-color,#d7dce3);margin:1.1rem 0}.gw-group{background:var(--background-color-low,#f6f7f9);border:1px solid var(--border-color,#d7dce3);border-radius:5px;padding:.85rem .95rem;margin-top:.55rem;max-width:680px}.gw-group-title{font-weight:700;font-size:.9rem;margin-bottom:.7rem}.gw-band-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem 1.6rem}.gw-band{white-space:nowrap;line-height:1.6}.gw-band input{margin-right:.35rem}.gw-active{color:#059669;font-size:.82rem;font-weight:700;margin-left:.5rem}.gw-off{color:var(--text-color-muted,#64748b);font-size:.82rem;margin-left:.5rem}.gw-input,.gw-select{height:2rem;border:1px solid var(--border-color,#cbd5e1);border-radius:4px;padding:.25rem .55rem;background:var(--background-color-high,#fff);color:inherit;min-width:290px;max-width:100%;font:inherit}.gw-small{width:74px;min-width:74px}.gw-radio{margin-right:.4rem}.gw-toggle input{vertical-align:middle}.gw-msg{background:#ecfdf5;border:1px solid #10b981;color:#065f46;padding:.55rem .75rem;border-radius:4px;margin-bottom:.75rem}.gw-actions{text-align:right;margin-top:1.1rem}.gw-actions .cbi-button{margin-left:.5rem}.gw-advanced-head{display:inline-block;background:var(--background-color-low,#edf1f5);border:1px solid var(--border-color,#d7dce3);border-radius:4px;padding:.45rem .85rem;color:inherit;font-weight:700;cursor:pointer}.gw-sepbox{background:var(--background-color-low,#f6f7f9);border:1px solid var(--border-color,#d7dce3);border-radius:5px;padding:.8rem .9rem;margin:.7rem 0;max-width:680px}.gw-septitle{font-weight:700;margin-bottom:.55rem;color:inherit}@media(max-width:700px){.gw-row{display:block}.gw-label{width:auto;text-align:left;margin:0 0 .35rem}.gw-input,.gw-select{min-width:100%;width:100%}.gw-band-grid{grid-template-columns:1fr}.gw-page{padding:0}.gw-panel{padding:.85rem}}
+.gw-table{width:100%;border-collapse:collapse;margin-top:.5rem}.gw-table th,.gw-table td{border-bottom:1px solid var(--border-color,#d7dce3);padding:.45rem .5rem;text-align:left}.gw-table th{color:var(--text-color-muted,#64748b);font-weight:700;background:var(--background-color-low,#f6f7f9)}
+</style>
+
+<div class="gw-page">
+  <div class="gw-head">访客 Wi-Fi</div>
+  <div class="gw-panel">
+    <% if msg then %><div class="gw-msg"><%=msg%></div><% end %>
+    <form method="post" action="<%=REQUEST_URI%>">
+      <div class="gw-row">
+        <div class="gw-label">启用访客网络：</div>
+        <div class="gw-field gw-toggle">
+          <label><input id="gw-enabled" type="checkbox" name="enabled" value="1" <%=checked("enabled")%> /> 启用</label>
+          <span id="gw-status" class="gw-active"></span>
+        </div>
+      </div>
+
+      <div class="gw-divider"></div>
+
+      <div class="gw-row gw-enabled-only">
+        <div class="gw-label">频段控制模式：</div>
+        <div class="gw-field">
+          <label><input class="gw-radio" type="radio" name="mode" value="unified" <%=(mode == "unified") and 'checked="checked"' or ""%> />智能多频合一（推荐）</label>
+          <label style="margin-left:28px"><input class="gw-radio" type="radio" name="mode" value="separate" <%=(mode == "separate") and 'checked="checked"' or ""%> />高级独立设置</label>
+          <div id="gw-band-box" class="gw-group">
+            <div class="gw-group-title">请勾选允许访客接入的物理频段：</div>
+            <div class="gw-band-grid">
+              <label class="gw-band"><input type="checkbox" name="radio24g" value="1" <%=checked("radio24g")%> /> 2.4 GHz (Radio0)<span data-band="radio24g"></span></label>
+              <label class="gw-band"><input type="checkbox" name="radio5g_low" value="1" <%=checked("radio5g_low")%> /> 5.2 GHz (Radio1) - 低频段<span data-band="radio5g_low"></span></label>
+              <label class="gw-band"><input type="checkbox" name="radio5g_high" value="1" <%=checked("radio5g_high")%> /> 5.8 GHz (Radio2) - 高频段<span data-band="radio5g_high"></span></label>
+            </div>
+            <div class="gw-hint" style="margin:10px 0 0">提示：多频合一模式下，勾选的频段将自动生成相同的无线名称与密码，终端根据信号强弱自动漫游。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="gw-divider gw-enabled-only"></div>
+
+      <div id="gw-unified" class="gw-enabled-only">
+        <div class="gw-row"><div class="gw-label">访客 Wi-Fi 名称 (SSID)：</div><div class="gw-field"><input class="gw-input" name="ssid" value="<%=v("ssid", "GuestWiFi")%>" /></div></div>
+        <div class="gw-row"><div class="gw-label">加密方式：</div><div class="gw-field"><select class="gw-select" name="encryption"><option value="psk2+ccmp" <%=sel("encryption", "psk2+ccmp")%>>WPA2-PSK AES（推荐）</option><option value="psk-mixed" <%=sel("encryption", "psk-mixed")%>>WPA/WPA2 混合兼容</option><option value="none" <%=sel("encryption", "none")%>>开放网络（无密码）</option></select><span class="gw-hint">仅保留 QWRT/QSDK 已验证可用选项</span></div></div>
+        <div class="gw-row"><div class="gw-label">无线密码：</div><div class="gw-field"><input class="gw-input" type="text" name="key" value="<%=v("key", "Guest@123456")%>" /></div></div>
+      </div>
+
+      <div id="gw-separate" class="gw-enabled-only">
+        <div class="gw-sepbox" data-bind="radio24g"><div class="gw-septitle">2.4 GHz 独立配置</div><input class="gw-input" name="ssid_24g" value="<%=v("ssid_24g", "Guest-2.4G")%>" placeholder="SSID" /> <select class="gw-select" name="encryption_24g"><option value="psk2+ccmp" <%=sel("encryption_24g", "psk2+ccmp")%>>WPA2-PSK AES</option><option value="psk-mixed" <%=sel("encryption_24g", "psk-mixed")%>>WPA/WPA2 混合</option><option value="none" <%=sel("encryption_24g", "none")%>>开放</option></select> <input class="gw-input" type="text" name="key_24g" value="<%=v("key_24g", "")%>" placeholder="密码" /></div>
+        <div class="gw-sepbox" data-bind="radio5g_low"><div class="gw-septitle">5.2 GHz 低频段独立配置</div><input class="gw-input" name="ssid_5g_low" value="<%=v("ssid_5g_low", "Guest-5G-L")%>" placeholder="SSID" /> <select class="gw-select" name="encryption_5g_low"><option value="psk2+ccmp" <%=sel("encryption_5g_low", "psk2+ccmp")%>>WPA2-PSK AES</option><option value="psk-mixed" <%=sel("encryption_5g_low", "psk-mixed")%>>WPA/WPA2 混合</option><option value="none" <%=sel("encryption_5g_low", "none")%>>开放</option></select> <input class="gw-input" type="text" name="key_5g_low" value="<%=v("key_5g_low", "")%>" placeholder="密码" /></div>
+        <div class="gw-sepbox" data-bind="radio5g_high"><div class="gw-septitle">5.8 GHz 高频段独立配置</div><input class="gw-input" name="ssid_5g_high" value="<%=v("ssid_5g_high", "Guest-5G-H")%>" placeholder="SSID" /> <select class="gw-select" name="encryption_5g_high"><option value="psk2+ccmp" <%=sel("encryption_5g_high", "psk2+ccmp")%>>WPA2-PSK AES</option><option value="psk-mixed" <%=sel("encryption_5g_high", "psk-mixed")%>>WPA/WPA2 混合</option><option value="none" <%=sel("encryption_5g_high", "none")%>>开放</option></select> <input class="gw-input" type="text" name="key_5g_high" value="<%=v("key_5g_high", "")%>" placeholder="密码" /></div>
+      </div>
+
+      <div class="gw-divider gw-enabled-only"></div>
+
+      <div class="gw-enabled-only">
+        <div class="gw-row"><div class="gw-label">当前访客设备：</div><div class="gw-field">
+          <table class="gw-table">
+            <tr><th>状态</th><th>设备名</th><th>IP</th><th>MAC</th></tr>
+            <% if clients and #clients > 0 then for _, c in ipairs(clients) do %>
+              <tr><td><%=c.online == "1" and "在线" or "租约"%></td><td><%=c.name%></td><td><%=c.ip%></td><td><%=c.mac%></td></tr>
+            <% end else %>
+              <tr><td colspan="4" class="gw-hint">暂无访客设备租约</td></tr>
+            <% end %>
+          </table>
+        </div></div>
+      </div>
+
+      <div class="gw-divider gw-enabled-only"></div>
+
+      <div class="gw-enabled-only">
+        <div class="gw-row"><div class="gw-label">AP 内部隔离：</div><div class="gw-field"><label><input type="checkbox" name="ap_isolate" value="1" <%=checked("ap_isolate")%> /> 开启</label><span class="gw-hint">开启后，访客设备之间无法互访。</span></div></div>
+        <div class="gw-row"><div class="gw-label">隔离主局域网：</div><div class="gw-field"><label><input type="checkbox" name="lan_isolate" value="1" <%=checked("lan_isolate")%> /> 开启</label><span class="gw-hint">开启后，访客无法访问路由器后台、NAS 和家庭主网设备。</span></div></div>
+      </div>
+
+      <div class="gw-divider gw-enabled-only"></div>
+
+      <div class="gw-enabled-only">
+        <span id="gw-adv-head" class="gw-advanced-head">高级网络参数 ▼</span><span class="gw-hint">（独立接口：<%=v("subnet", "192.168.200.1")%> / DHCP 自动管理）</span>
+        <div id="gw-advanced" style="display:none;margin-top:12px">
+          <div class="gw-row"><div class="gw-label">子网网关：</div><div class="gw-field"><input class="gw-input" name="subnet" value="<%=v("subnet", "192.168.200.1")%>" /></div></div>
+          <div class="gw-row"><div class="gw-label">子网掩码：</div><div class="gw-field"><select class="gw-select" name="netmask"><option value="255.255.255.0" <%=sel("netmask", "255.255.255.0")%>>/24 (255.255.255.0)</option><option value="255.255.0.0" <%=sel("netmask", "255.255.0.0")%>>/16 (255.255.0.0)</option></select></div></div>
+          <div class="gw-row"><div class="gw-label">DHCP：</div><div class="gw-field">起始 <input class="gw-input gw-small" name="dhcp_start" value="<%=v("dhcp_start", "100")%>" /> 数量 <input class="gw-input gw-small" name="dhcp_limit" value="<%=v("dhcp_limit", "50")%>" /></div></div>
+          <div class="gw-row"><div class="gw-label">租期：</div><div class="gw-field"><input class="gw-input gw-small" name="leasetime" value="<%=v("leasetime", "12h")%>" /></div></div>
+        </div>
+      </div>
+
+      <div class="gw-actions">
+        <button class="cbi-button cbi-button-apply" name="gw_action" value="apply">保存并应用</button>
+        <button class="cbi-button cbi-button-save" name="gw_action" value="save">保存</button>
+        <button class="cbi-button cbi-button-reset" name="gw_action" value="reset" onclick="return confirm('确认清理访客 Wi-Fi 配置？')">重置</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+(function(){
+function q(s){return document.querySelector(s)}
+function all(s){return Array.prototype.slice.call(document.querySelectorAll(s))}
+function checked(n){var e=q('input[name="'+n+'"][type="checkbox"]');return !!(e&&e.checked)}
+function mode(){var e=q('input[name="mode"]:checked');return e?e.value:'unified'}
+function fieldRow(n){var e=q('[name="'+n+'"]');while(e&&!(e.classList&&e.classList.contains('gw-row')))e=e.parentNode;return e}
+function update(){
+ var en=checked('enabled'), m=mode();
+ all('.gw-enabled-only').forEach(function(e){e.style.display=en?'':'none'});
+ q('#gw-unified').style.display=en&&m==='unified'?'':'none';
+ q('#gw-separate').style.display=en&&m==='separate'?'':'none';
+ all('[data-bind]').forEach(function(e){e.style.display=checked(e.getAttribute('data-bind'))?'':'none'});
+ var keyRow=fieldRow('key'); if(keyRow)keyRow.style.display=(q('[name="encryption"]').value==='none')?'none':'';
+ [['encryption_24g','key_24g'],['encryption_5g_low','key_5g_low'],['encryption_5g_high','key_5g_high']].forEach(function(p){var enc=q('[name="'+p[0]+'"]'), key=q('[name="'+p[1]+'"]'); if(key)key.style.display=(enc&&enc.value==='none')?'none':''});
+ ['radio24g','radio5g_low','radio5g_high'].forEach(function(n){var s=q('[data-band="'+n+'"]');if(s){s.className=checked(n)?'gw-active':'gw-off';s.textContent=checked(n)?' Active':' 已预留给主人专用通道'}});
+ var status=q('#gw-status');if(status)status.textContent=en?'已启用':'已关闭';
+}
+all('input,select').forEach(function(e){e.addEventListener('change',update)});
+q('#gw-adv-head').onclick=function(){var b=q('#gw-advanced');b.style.display=b.style.display==='none'?'':'none';this.textContent=b.style.display==='none'?'高级网络参数 ▼':'高级网络参数 ▲'};
+update();
+})();
+//]]>
+</script>
+
+<%+footer%>
